@@ -1,0 +1,36 @@
+{
+ "drivers": [
+  {
+   "id": "59691f2aaed6",
+   "name": "Hhh",
+   "phone": "333",
+   "vehicle": "Ggg",
+   "plate": "Ggg",
+   "license": "Gtg",
+   "status": "approved",
+   "salt": "83e0e4672d11",
+   "created": 1792859379222,
+   "hash": "07c86b89082843b20ace3ed344f293204b79f31973ae00f8bf701bea2930fc78"
+  }
+ ],
+ "rides": [
+  {
+   "id": "e9fd239c7062",
+   "name": "Mwaba Kunda",
+   "phone": "1234567890",
+   "pickup": "Pinned on map",
+   "dropoff": "Pinned on map",
+   "pLat": -10.257798620407641,
+   "pLng": 29.92263793945313,
+   "dLat": -10.266582214867428,
+   "dLng": 29.927530288696293,
+   "payment": "mtn",
+   "status": "completed",
+   "driverId": "59691f2aaed6",
+   "created": 1792859463597,
+   "km": 1.1,
+   "fare": 11,
+   "road": true
+  }
+ ]
+}

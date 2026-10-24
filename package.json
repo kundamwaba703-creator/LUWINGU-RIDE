@@ -1,0 +1,1 @@
+{"name":"luwingu-rider","version":"1.0.0","description":"Ride requests for Luwingu","main":"server.js","scripts":{"start":"node server.js"}}

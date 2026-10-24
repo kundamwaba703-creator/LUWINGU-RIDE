@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Luwingu Rider - Drivers</title><link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><link rel="stylesheet" href="/style.css"></head><body>
+<header><b>Luwingu Rider: Drivers</b><span><a href="/">Passenger page</a><a href="#" id="out" class="hide">Log out</a></span></header>
+<main>
+<section id="auth">
+<div class="card"><h2>Log in</h2><label for="lp">Phone number</label><input id="lp" type="tel"><label for="lw">Password</label><input id="lw" type="password">
+<p class="msg" id="le" role="alert"></p><button id="login">Log in</button></div>
+<div class="card"><h2>New driver? Register</h2>
+<label for="rn">Full name</label><input id="rn"><label for="rp">Phone number</label><input id="rp" type="tel">
+<label for="rv">Vehicle (e.g. white Toyota Corolla, motorbike)</label><input id="rv"><label for="rpl">Number plate</label><input id="rpl">
+<label for="rl">Driving licence number</label><input id="rl"><label for="rw">Password (6+ characters)</label><input id="rw" type="password">
+<p class="msg" id="re" role="alert"></p><button id="reg">Send registration</button></div></section>
+<section id="board" class="hide"><h2>Ride requests</h2><p class="mute" id="hello"></p>
+<div id="map" role="application" aria-label="Map showing pickup and destination"></div><p class="mute" id="mapcap">Tap "View on map" on a request to see it here.</p>
+<h3>Your current rides</h3><div id="mine"></div><h3>Waiting for a driver</h3><div id="open"></div></section>
+</main><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script src="/app.js"></script><script>
+let tok=sessionStorage.getItem('dt'),timer,map,layer,sel=null,seq=0;
+if(window.L){map=L.map('map').setView([-10.2667,29.9167],14); // Luwingu, Zambia
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);layer=L.layerGroup().addTo(map)}
+else $('#map').textContent='The map needs an internet connection.';
+function showRide(r){if(!map)return;sel=r.id;layer.clearLayers();const pts=[];
+  const add=(a,o,c,t)=>{if(a==null)return;const ll=[a,o];L.circleMarker(ll,{radius:10,color:'#fff',weight:3,fillColor:c,fillOpacity:1}).bindTooltip(t,{permanent:true,direction:'top'}).addTo(layer);pts.push(ll)};
+  add(r.pLat,r.pLng,'#0f5a3a','Pickup');add(r.dLat,r.dLng,'#e0a800','Destination');
+  if(pts.length===2){const tk=++seq,fb=L.polyline(pts,{color:'#0f5a3a',dashArray:'6'}).addTo(layer); // straight line until the road route arrives
+    fetch('https://router.project-osrm.org/route/v1/driving/'+r.pLng+','+r.pLat+';'+r.dLng+','+r.dLat+'?overview=full&geometries=geojson').then(x=>x.json()).then(j=>{
+      if(tk!==seq||!j.routes||!j.routes[0])return;const g=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]]);
+      layer.removeLayer(fb);const rl=L.polyline(g,{color:'#0f5a3a',weight:5,opacity:.85}).addTo(layer);map.fitBounds(rl.getBounds(),{padding:[40,40],maxZoom:16})}).catch(()=>{})}
+  if(pts.length)map.fitBounds(pts,{padding:[40,40],maxZoom:16});
+  $('#mapcap').textContent=r.pickup+' to '+r.dropoff+(r.fare!=null?' | Fare K'+r.fare+' ('+r.km+' km)':'')}
+$('#reg').onclick=async()=>{const e=$('#re');try{await api('/api/driver/register',{name:$('#rn').value,phone:$('#rp').value,vehicle:$('#rv').value,plate:$('#rpl').value,license:$('#rl').value,password:$('#rw').value});e.className='ok';e.textContent='Registration sent. An admin must approve you before you can log in.'}catch(x){e.className='msg';e.textContent=x.message}};
+$('#login').onclick=async()=>{try{const r=await api('/api/driver/login',{phone:$('#lp').value,password:$('#lw').value});tok=r.token;sessionStorage.setItem('dt',tok);sessionStorage.setItem('dn',r.name);start()}catch(x){$('#le').textContent=x.message}};
+$('#out').onclick=e=>{e.preventDefault();sessionStorage.clear();location.reload()};
+function card(r,btns){const c=el('div','','card');c.append(el('b',r.pickup+' to '+r.dropoff),el('p',r.name+', '+r.phone,'mute'),...(r.fare!=null?[el('p','Fare K'+r.fare+' ('+r.km+' km)','ok')]:[]),...(r.payment?[el('p','Payment: '+PAYL[r.payment])]:[]),el('p',when(r.created),'mute'));const lk=(t,a,o)=>{if(a==null)return;const l=el('a',t,'mute');l.href='https://www.openstreetmap.org/?mlat='+a+'&mlon='+o+'#map=17/'+a+'/'+o;l.target='_blank';l.rel='noopener';l.style.marginRight='14px';c.append(l)};lk('Pickup on map',r.pLat,r.pLng);lk('Destination on map',r.dLat,r.dLng);if(map&&r.pLat!=null){const v=el('button','View on map','sm alt');v.onclick=()=>{showRide(r);$('#map').scrollIntoView({behavior:'smooth',block:'center'})};c.append(v)}btns.forEach(([t,u,cls])=>{const b=el('button',t,'sm '+(cls||''));b.onclick=async()=>{try{await api(u,{},tok)}catch(e){alert(e.message)}load()};c.append(b)});return c}
+async function load(){
+  try{const d=await api('/api/driver/rides',undefined,tok);
+    $('#mine').replaceChildren(...(d.mine.length?d.mine.map(r=>card(r,[['Mark complete','/api/driver/rides/'+r.id+'/complete']])):[el('p','None right now.','mute')]));
+    $('#open').replaceChildren(...(d.open.length?d.open.map(r=>card(r,[['Accept ride','/api/driver/rides/'+r.id+'/accept']])):[el('p','No requests yet. This list refreshes by itself.','mute')]));
+    if(map){const all=[...d.mine,...d.open];if(!all.find(r=>r.id===sel&&r.pLat!=null)){const f=all.find(r=>r.pLat!=null);if(f)showRide(f);else{sel=null;layer.clearLayers();$('#mapcap').textContent='No requests with a map pin yet.'}}}
+    $('#hello').textContent='Hello '+sessionStorage.getItem('dn')+'. Trips completed: '+d.done;
+  }catch(e){if(e.status===401){sessionStorage.clear();location.reload()}}
+  clearTimeout(timer);timer=setTimeout(load,4000);
+}
+function start(){$('#auth').classList.add('hide');$('#board').classList.remove('hide');$('#out').classList.remove('hide');if(map)map.invalidateSize();load()}
+if(tok)start();
+</script></body></html>
